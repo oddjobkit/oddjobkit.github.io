@@ -235,7 +235,8 @@ p, li { text-wrap: pretty; }
 /* Home and indexes: one ruled list, not a grid of boxes */
 .open { padding-block: 2.75rem 0.5rem; }
 .open .lede { margin-block-start: 1.25rem; max-inline-size: 34rem; }
-.shelf, .bench { padding-block-start: 2.25rem; }
+.shelf { padding-block-start: 2rem; }
+.bench { padding-block-start: 1.75rem; }
 .shelf h2, .bench h2 {
   font-size: 0.9375rem;
   font-weight: 650;
@@ -246,12 +247,13 @@ p, li { text-wrap: pretty; }
 .shelf ul {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.75rem;
+  gap: 1.25rem 2rem;
 }
 .bench ul {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: 2rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: 1.5rem;
+  row-gap: 0.15rem;
 }
 .pick {
   display: grid;
@@ -262,25 +264,25 @@ p, li { text-wrap: pretty; }
   border-radius: 14px;
 }
 .shelf .pick {
-  grid-template-columns: 5rem minmax(0, 1fr);
-  column-gap: 0.9rem;
-  row-gap: 0.2rem;
-  align-items: start;
-  padding: 0.65rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.4rem;
   min-block-size: var(--target);
 }
-.shelf .pick img { grid-row: 1 / span 2; inline-size: 5rem; block-size: 5rem; }
-.shelf .pick h3, .shelf .pick p { align-self: start; }
-.shelf .pick p { margin: 0; font-size: 0.9375rem; }
+.shelf .pick img { inline-size: 4.75rem; block-size: 4.75rem; }
+.shelf .pick p { margin: 0; font-size: 0.9375rem; max-inline-size: 16rem; }
 .bench ul { row-gap: 0.25rem; }
 .bench .pick {
   grid-template-columns: 2.75rem minmax(0, 1fr);
-  column-gap: 0.8rem;
+  column-gap: 0.75rem;
   row-gap: 0.1rem;
-  padding: 0.7rem 0.5rem;
+  align-items: start;
+  padding: 0.65rem 0.35rem;
   border-radius: 10px;
 }
-.bench .pick img { grid-row: 1 / span 2; inline-size: 2.75rem; block-size: 2.75rem; }
+.bench .pick img { grid-row: 1 / span 2; inline-size: 2.75rem; block-size: 2.75rem; margin-block-start: 0.12rem; }
 .bench .pick p { margin: 0; font-size: 0.875rem; color: var(--text); }
 .pick:hover { background: var(--sunken); text-decoration: none; }
 .pick:hover h3 { text-decoration: underline; text-underline-offset: 0.14em; }
@@ -289,8 +291,22 @@ p, li { text-wrap: pretty; }
   .pick { transition: background-color 120ms ease-out; }
 }
 @container shell (inline-size < 44rem) {
-  .shelf ul, .bench ul { grid-template-columns: 1fr; }
+  .shelf ul { grid-template-columns: 1fr; }
+  .shelf .pick {
+    display: grid;
+    grid-template-columns: 4.75rem minmax(0, 1fr);
+    column-gap: 0.9rem;
+    row-gap: 0.15rem;
+    align-items: center;
+  }
+  .shelf .pick img { grid-row: 1 / span 2; }
+  .shelf .pick h3, .shelf .pick p { grid-column: 2; }
+  .bench ul { grid-template-columns: 1fr; }
 }
+@container shell (inline-size >= 44rem) and (inline-size < 58rem) {
+  .bench ul { grid-template-columns: 1fr 1fr; }
+}
+.catalog .roster { max-inline-size: 48rem; }
 .roster, .facts ul, .perms { list-style: none; padding: 0; }
 .roster { border-block-start: 1px solid var(--rule); }
 .line {

@@ -403,7 +403,7 @@ function homePage(tools: Tool[]): string {
   const later = tools.filter((t) => !first.includes(t));
   const body = `<section class="open" aria-labelledby="top">
   <h1 id="top">One odd job.<br>Done properly.</h1>
-  <p class="lede">Small Chrome extensions for the task you would otherwise hunt for a sketchy website to do. Each one stays on your machine. Nothing is sold.</p>
+  <p class="lede">Small Chrome extensions for the job you would otherwise hunt for a sketchy website to do. Nothing is sold.</p>
 </section>
 <section class="shelf" aria-labelledby="first">
   <h2 id="first">First release</h2>
