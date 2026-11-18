@@ -11,9 +11,9 @@ bun scripts/build-pages.ts && bun scripts/check-contrast.ts && bun scripts/check
 ```
 
 `build-pages.ts` (Bun, no dependencies; `--repos <dir>` points elsewhere, `--dry` writes nothing) overwrites only:
-`index.html`, `privacy/<tool>/index.html`, `privacy/index.html`, `tools/index.html`, `assets/icons/<tool>.png` (from `repos/ui/icons/out/<tool>/icon-128.png`) and `sitemap.xml`. It prints each tool's version, status and any parse warning. The home page's own copy (statement, "How we build", contact) is written in `homePage()` in `build-pages.ts`; its three first-release cards use the same tool data as `/tools/` (the "First release soon" pill becomes a Chrome Web Store button when a tool's `Item ID` is set). `assets/site.css` is hand-written; `check-contrast.ts` gates its colour tokens (WCAG, both schemes) and `check-links.ts` crawls the site on a local server (`bun scripts/serve.ts` previews it at http://localhost:4173/).
+`index.html`, `privacy/<tool>/index.html`, `privacy/index.html`, `tools/index.html`, `assets/icons/<tool>.png` (from `repos/ui/icons/out/<tool>/icon-128.png`) and `sitemap.xml`. It prints each tool's version, status and any parse warning. The home page's own copy (statement, "How every tool is built") is written in `homePage()` in `build-pages.ts`; its three first-release rows use the same tool data as `/tools/` (a tool's pill becomes a Chrome Web Store button when its `Item ID` is set). `assets/site.css` is hand-written; `check-contrast.ts` gates its colour tokens (WCAG, both schemes) and `check-links.ts` crawls the site on a local server (`bun scripts/serve.ts` previews it at http://localhost:4173/).
 
-Constants at the top of `build-pages.ts`: `FOCUS` (tools listed as "First release soon"; every other tool is "Not yet released"), `PUBLIC_REPOS` (add a tool when its GitHub repo goes public; until then the source line says "available at release"), `NOT_TOOLS`.
+Constants at the top of `build-pages.ts`: `FOCUS` (tools listed as "First release"; every other tool is "In progress"), `PUBLIC_REPOS` (add a tool when its GitHub repo goes public; until then the source line says "available at release"), `NOT_TOOLS`.
 
 ### Keeping CHROMEWEBSTORE.md parseable
 

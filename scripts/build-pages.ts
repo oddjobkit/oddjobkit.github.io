@@ -83,6 +83,18 @@ interface Tool {
 }
 
 const stripQuotes = (s: string) => s.replace(/^["“]\s*/, "").replace(/\s*["”]$/, "");
+/** Drop author labels ("Data-use sentence", "Trust line", "Dashboard") so the public page gets the sentence, not the note. */
+function publicSentence(s: string): string {
+  const quoted = s.match(/Privacy page(?: and Dashboard)?:\s*["“]([^"”]+)/i);
+  if (quoted) return quoted[1]!.replace(/["”]\s*$/, "").trim();
+  const labelled = /^Data-use sentence\b/i.test(s);
+  const t = stripQuotes(s
+    .replace(/^Data-use sentence\b[^:]*:\s*/i, "")
+    .replace(/^Trust line:\s*/i, "")
+    .replace(/^Yes:\s*/i, "")
+    .trim());
+  return labelled && /^[a-z]/.test(t) ? t[0]!.toUpperCase() + t.slice(1) : t;
+}
 
 function parsePerms(secs: Section[]): Perm[] {
   const s = secs.find((x) => x.level === 2 && /^permissions?\b/i.test(x.title));
@@ -133,18 +145,18 @@ function dataUse(secs: Section[], all: string[]): string | null {
   // 3. the answer on the "Does the extension collect user data?" line, 4. the paragraph under that line.
   const h = secs.find((s) => s.level === 3 && /data[- ]use (sentence|statement)/i.test(s.title));
   const first = h?.body.map((l) => l.trim()).find(Boolean);
-  if (first) return stripQuotes(first);
+  if (first) return publicSentence(first);
   const lab = labelled(all, /Data-use (statement|sentence)/i);
-  if (lab) return stripQuotes(lab);
+  if (lab) return publicSentence(lab);
   const i = all.findIndex((l) => /^\*\*Does the extension (collect|use) user data\?\*\*/.test(l));
   if (i < 0) return null;
   const same = all[i]!.replace(/^\*\*[^*]*\*\*\s*/, "").trim();
-  if (same.split(/\s+/).length > 6 && !/^Dashboard answer/i.test(same)) return same;
+  if (same.split(/\s+/).length > 6 && !/^Dashboard answer/i.test(same)) return publicSentence(same);
   for (let j = i + 1; j < all.length; j++) {
     const l = all[j]!.trim();
     if (!l || l.startsWith("<!--")) continue;
     if (/^(#|\||\*\*|-|>)/.test(l)) break;
-    return l;
+    return publicSentence(l);
   }
   return null;
 }
@@ -235,14 +247,34 @@ function para(p: string): string {
 
 const MARK = `<svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#1b2433"/><rect x="7" y="7" width="8" height="8" rx="1.5" fill="#fff"/><circle cx="21" cy="11" r="4.25" fill="#f5ae39"/><rect x="7" y="17" width="8" height="8" rx="1.5" fill="#fff"/><rect x="17" y="17" width="8" height="8" rx="1.5" fill="#fff"/></svg>`;
 
-function page(o: { title: string; desc: string; path: string; current?: "tools" | "privacy"; body: string; generated?: string }): string {
+/** The name a person says. The store title stays on the listing; it is written for search, not for a card. */
+const displayName = (slug: string) => slug.slice(0, 1).toUpperCase() + slug.slice(1);
+/** First sentence, without cutting a decimal such as "2.2". */
+const lead = (s: string) => { const t = s.trim(); const m = t.match(/^.*?[.!?](?=\s|$)/); return (m ? m[0] : t).trim(); };
+/** What a card can say without listing Chrome permission names. The names live on the listing. */
+function trustLine(t: Tool): string {
+  if (!t.perms.some((p) => p.names.length)) return "No permissions";
+  if (t.perms.some((p) => /host/.test(p.type) && p.names.length)) return "Asks for site access";
+  if (t.nothingLeaves) return "Nothing leaves this device";
+  return "Permissions on the listing";
+}
+const icon = (t: Tool, px: number, eager = false) => t.hasIcon
+  ? `<img class="tool-icon" src="/assets/icons/${t.slug}.png" alt="" width="${px}" height="${px}"${eager ? "" : " loading=\"lazy\""}>`
+  : "";
+
+function page(o: { title: string; desc: string; path: string; current?: "tools" | "privacy"; kind?: "home" | "catalog" | "doc"; body: string; generated?: string }): string {
   const url = ORIGIN + o.path;
-  const nav = (href: string, label: string, key: string) => `<a href="${href}"${o.current === key ? ' aria-current="page"' : ""}>${label}</a>`;
+  const kind = o.kind ?? "doc";
+  const nav = (href: string, label: string, key: string) => `<li><a href="${href}"${o.current === key ? ' aria-current="page"' : ""}>${label}</a></li>`;
+  const inner = kind === "doc" ? `<div class="doc">\n${o.body}\n</div>` : o.body;
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#fbf9f5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b0e14" media="(prefers-color-scheme: dark)">
 <title>${esc(o.title)}</title>
 <meta name="description" content="${esc(o.desc)}">
 <link rel="canonical" href="${url}">
@@ -254,17 +286,21 @@ function page(o: { title: string; desc: string; path: string; current?: "tools" 
 <link rel="stylesheet" href="/assets/site.css">
 ${o.generated ?? GENERATED}
 </head>
-<body>
+<body class="${kind}">
 <a class="skip" href="#main">Skip to content</a>
-<header class="wrap site-head">
-  <a class="brand" href="/">${MARK}Oddjob Kit</a>
-  <nav class="site-nav" aria-label="Site">${nav("/tools/", "Tools", "tools")}${nav("/privacy/", "Privacy", "privacy")}</nav>
+<header class="site-head">
+  <div class="shell bar">
+    <a class="brand" href="/">${MARK}<span>Oddjob Kit</span></a>
+    <nav class="site-nav" aria-label="Site"><ul>${nav("/tools/", "Tools", "tools")}${nav("/privacy/", "Privacy", "privacy")}</ul></nav>
+  </div>
 </header>
-<main id="main" class="wrap">
-${o.body}
+<main id="main">
+  <div class="shell">
+${inner}
+  </div>
 </main>
 <footer class="site-foot">
-  <div class="wrap">
+  <div class="shell bar">
     <span>© ${today.slice(0, 4)} Oddjob Kit</span>
     <a href="mailto:${CONTACT}">${CONTACT}</a>
     <a href="https://github.com/oddjobkit">GitHub</a>
@@ -288,8 +324,12 @@ function privacyPage(t: Tool): string {
   const source = PUBLIC_REPOS.includes(t.slug)
     ? `<a href="https://github.com/oddjobkit/${t.slug}">github.com/oddjobkit/${t.slug}</a>`
     : `<code>github.com/oddjobkit/${t.slug}</code>, available at release.`;
-  const body = `<p class="crumbs"><a href="/privacy/">Privacy</a> / ${esc(t.name)}</p>
-<h1>${esc(t.name)} — Privacy</h1>
+  const use = t.dataUse ? publicSentence(t.dataUse) : "";
+  const body = `<p class="crumbs"><a href="/privacy/">Privacy</a> / ${esc(displayName(t.slug))}</p>
+<div class="doc-head">
+  ${icon(t, 64, true)}
+  <h1>${esc(t.name)}</h1>
+</div>
 <dl class="meta">
   <dt>Effective</dt><dd><time datetime="${t.updated}">${longDate(t.updated)}</time></dd>
 ${t.version ? `  <dt>Applies to</dt><dd>Version ${esc(t.version)}</dd>\n` : ""}  <dt>Listing</dt><dd><a href="/tools/#${t.slug}">On the tools page</a></dd>
@@ -302,7 +342,7 @@ ${t.purpose ? `<p class="lede">${inline(t.purpose)}</p>\n` : ""}
 
 <section aria-labelledby="leaves">
   <h2 id="leaves">What leaves your device</h2>
-${t.nothingLeaves ? `  <p class="assurance"><span class="dot" aria-hidden="true"></span>Nothing leaves your device.</p>\n` : ""}${t.dataUse ? `  <p>${inline(t.dataUse)}</p>\n` : ""}</section>
+${t.nothingLeaves ? `  <p class="assurance"><span class="dot" aria-hidden="true"></span>Nothing leaves your device.</p>\n` : ""}${use ? `  <p>${inline(use)}</p>\n` : ""}</section>
 ${t.stored.length ? `
 <section aria-labelledby="stored">
   <h2 id="stored">What is stored</h2>
@@ -327,99 +367,90 @@ ${t.rest.map((p) => "  " + para(p)).join("\n")}
 }
 
 
-function homeToolRow(t: Tool): string {
-  const action = t.itemId
-    ? `<a class="store-link" href="https://chromewebstore.google.com/detail/${t.itemId}">Chrome Web Store</a>`
-    : `<span class="pill">First release soon</span>`;
-  return `    <li class="tool">
-      ${t.hasIcon ? `<img class="tool-icon" src="/assets/icons/${t.slug}.png" alt="" width="64" height="64">` : "<span></span>"}
-      <div class="tool-body">
-        <h3>${esc(t.name)}</h3>
-        <p class="tool-job">${inline(t.short || t.purpose)}</p>
-        <p class="tool-perms">${esc(t.permLine)}</p>
-        <p class="tool-links"><a href="/privacy/${t.slug}/">Privacy policy</a>${action}</p>
-      </div>
+function homeRow(t: Tool, eager: boolean): string {
+  return `    <li>
+      <a class="line" href="/tools/#${t.slug}">
+        ${icon(t, 64, eager)}
+        <h3>${esc(displayName(t.slug))}</h3>
+        <p class="job">${inline(lead(t.short || t.purpose))}</p>
+        <p class="status">${esc(status(t))}</p>
+      </a>
     </li>`;
 }
 
 const HOME_GENERATED = "<!-- generated by scripts/build-pages.ts: the copy is in homePage(), the tool cards come from each tool repo's CHROMEWEBSTORE.md; edit those, not this file -->";
 
 function homePage(tools: Tool[]): string {
-  const first = tools.filter((t) => t.itemId || FOCUS.includes(t.slug));
-  const body = `<section class="hero" aria-labelledby="top">
-  <h1 id="top">Free Chrome extensions that each do one odd job well.</h1>
-  <p class="lede">Single-purpose and production-grade. Every listing states its permissions and data use. Nothing is sold.</p>
-  <p class="actions"><a class="store-link" href="/tools/">See the tools</a><a href="/privacy/">Read the privacy policies</a></p>
+  const body = `<section class="open" aria-labelledby="top">
+  <h1 id="top">One odd job, done properly.</h1>
+  <p class="lede">Small Chrome extensions for the task you would otherwise hunt for a sketchy website to do. Each one stays on your machine. Nothing is sold.</p>
 </section>
-
-<section aria-labelledby="first">
-  <h2 id="first">First releases</h2>
-  <ul class="rows">
-${first.map(homeToolRow).join("\n")}
-  </ul>
-  <p class="more"><a href="/tools/">All ${tools.length} tools, including those still in progress</a></p>
-</section>
-
-<section aria-labelledby="build">
-  <h2 id="build">How we build</h2>
-  <ul class="principles">
-    <li><h3>No analytics inside extensions</h3><p>No tracking and no telemetry in any extension. Anything that does use the network is disclosed on the listing and in the privacy policy.</p></li>
-    <li><h3>Minimal permissions</h3><p>Each tool asks for the smallest set that does its job, and every permission is explained in plain words.</p></li>
-    <li><h3>Open source at release</h3><p>The source of each tool goes public on GitHub when the tool ships, so the claims can be checked.</p></li>
-    <li><h3>Replies to reviews</h3><p>Store reviews get a reply within a week, and the support address is read by a person.</p></li>
+<section class="index" aria-labelledby="kit">
+  <h2 id="kit">The kit</h2>
+  <ul class="roster">
+${tools.map((t, i) => homeRow(t, i < 4)).join("\n")}
   </ul>
 </section>
 
-<section aria-labelledby="contact">
-  <h2 id="contact">Contact</h2>
-  <p>Questions and bug reports: <a href="mailto:${CONTACT}">${CONTACT}</a>. Source: <a href="https://github.com/oddjobkit">github.com/oddjobkit</a>.</p>
+<section class="facts" aria-labelledby="build">
+  <h2 id="build">How every tool is built</h2>
+  <ul>
+    <li><h3>No analytics</h3><p>No tracking and no telemetry in any extension. Anything that does use the network is disclosed on the listing and in the privacy policy.</p></li>
+    <li><h3>Few permissions</h3><p>Each tool asks for the smallest set that does its job, and every permission is explained in plain words.</p></li>
+    <li><h3>Source at release</h3><p>The source of each tool goes public on GitHub when the tool ships, so the claims can be checked.</p></li>
+    <li><h3>A person reads the mail</h3><p>Store reviews get a reply within a week. Questions go to <a href="mailto:${CONTACT}">${CONTACT}</a>.</p></li>
+  </ul>
 </section>`;
-  return page({ title: "Oddjob Kit — free single-purpose Chrome extensions", desc: "Free, single-purpose, production-grade Chrome extensions. One job each; permissions and data use are stated on every listing.", path: "/", body, generated: HOME_GENERATED });
+  return page({ title: "Oddjob Kit — small Chrome extensions that each do one odd job well", desc: "Small Chrome extensions that each do one odd job. The task you would otherwise hunt for a sketchy website to do. Permissions are stated on every listing.", path: "/", kind: "home", body, generated: HOME_GENERATED });
 }
 
-const status = (t: Tool) => (t.itemId ? "On the Chrome Web Store" : FOCUS.includes(t.slug) ? "First release soon" : "Not yet released");
+const status = (t: Tool) => (t.itemId ? "On the Chrome Web Store" : FOCUS.includes(t.slug) ? "First release" : "In progress");
 
 function toolRow(t: Tool): string {
   const store = t.itemId
     ? `<a class="store-link" href="https://chromewebstore.google.com/detail/${t.itemId}">Chrome Web Store</a>`
-    : `<!-- store-link:${t.slug} placeholder; becomes a link when CHROMEWEBSTORE.md has an Item ID -->\n        <span class="store-slot" data-store-link="pending">Chrome Web Store page: added at release</span>`;
-  return `    <li class="tool" id="${t.slug}">
-      ${t.hasIcon ? `<img class="tool-icon" src="/assets/icons/${t.slug}.png" alt="" width="64" height="64">` : "<span></span>"}
-      <div class="tool-body">
-        <h3>${esc(t.name)}</h3>
-        <p class="tool-job">${inline(t.short || t.purpose)}</p>
+    : `<!-- store-link:${t.slug} placeholder; becomes a link when CHROMEWEBSTORE.md has an Item ID -->`;
+  return `    <li class="line detail" id="${t.slug}">
+      ${icon(t, 64)}
+      <div class="line-body">
+        <h3>${esc(displayName(t.slug))}</h3>
+        <p class="store-name">${esc(t.name)}</p>
+        <p class="job">${inline(t.short || t.purpose)}</p>
         <p class="tool-perms">${esc(t.permLine)}</p>
-        <p class="tool-meta"><span class="pill">${status(t)}</span><code>${t.slug}</code>${t.version ? `<span>Version ${esc(t.version)}</span>` : ""}</p>
-        <p class="tool-links">
-        <a href="/privacy/${t.slug}/">Privacy policy</a>
-        ${store}
-        </p>
+        <p class="tool-links"><a href="/privacy/${t.slug}/">Privacy policy</a>${store}</p>
       </div>
+      <p class="status">${status(t)}${t.version ? ` · ${esc(t.version)}` : ""}</p>
     </li>`;
 }
 
 function toolsPage(tools: Tool[]): string {
-  const next = tools.filter((t) => t.itemId || FOCUS.includes(t.slug));
-  const later = tools.filter((t) => !next.includes(t));
-  const group = (label: string, list: Tool[]) => (list.length ? `<h2 class="group-label">${label}</h2>\n  <ul class="rows">\n${list.map(toolRow).join("\n")}\n  </ul>` : "");
-  const body = `<h1>Tools</h1>
-<p class="lede">Small Chrome extensions that each do one odd job. Every tool lists the permissions it asks for and links to its privacy policy.</p>
-  ${group("First releases", next)}
-  ${group("Not yet released", later)}`;
-  return page({ title: "Tools — Oddjob Kit", desc: "The Oddjob Kit tools: what each one does, the permissions it asks for, and its privacy policy.", path: "/tools/", current: "tools", body });
+  const body = `<div class="page-head">
+<h1>Tools</h1>
+<p class="lede">What each extension does, the permissions it asks for, and its privacy policy.</p>
+</div>
+  <ul class="roster">
+${tools.map(toolRow).join("\n")}
+  </ul>`;
+  return page({ title: "Tools — Oddjob Kit", desc: "The Oddjob Kit tools: what each one does, the permissions it asks for, and its privacy policy.", path: "/tools/", current: "tools", kind: "catalog", body });
 }
 
 function privacyIndex(tools: Tool[]): string {
   const row = (t: Tool) => `    <li>
-      <div class="policy-row"><a href="/privacy/${t.slug}/">${esc(t.name)}</a><span class="meta-line">${t.version ? `Version ${esc(t.version)} · ` : ""}Effective ${longDate(t.updated)}</span></div>
-      <p class="tool-perms">${esc(t.permLine)}</p>
+      <a class="line" href="/privacy/${t.slug}/">
+        ${icon(t, 64)}
+        <h3>${esc(displayName(t.slug))}</h3>
+        <p class="job">${esc(trustLine(t))}</p>
+        <p class="status">${longDate(t.updated)}</p>
+      </a>
     </li>`;
-  const body = `<h1>Privacy</h1>
+  const body = `<div class="page-head">
+<h1>Privacy</h1>
 <p class="lede">One policy per tool. Each says what the tool can access, what leaves your device and what it stores.</p>
-  <ul class="rows">
+</div>
+  <ul class="roster">
 ${tools.map(row).join("\n")}
   </ul>`;
-  return page({ title: "Privacy — Oddjob Kit", desc: "The privacy policy of every Oddjob Kit tool: what it can access, what leaves your device and what it stores.", path: "/privacy/", current: "privacy", body });
+  return page({ title: "Privacy — Oddjob Kit", desc: "The privacy policy of every Oddjob Kit tool: what it can access, what leaves your device and what it stores.", path: "/privacy/", current: "privacy", kind: "catalog", body });
 }
 
 // ── Output ───────────────────────────────────────────────────────────────────────────────────

@@ -62,6 +62,8 @@ const PAIRS: [string, string, number, string][] = [
   ["ink", "sunken", 3, "focus ring on sunken tone"],
   ["marker-edge", "page", 3, "marker dot boundary"],
   ["marker-edge", "raised", 3, "marker dot boundary"],
+  ["rule", "page", 3, "header, footer and card boundaries"],
+  ["rule", "raised", 3, "card boundary on a raised surface"],
 ];
 
 let failed = 0;
