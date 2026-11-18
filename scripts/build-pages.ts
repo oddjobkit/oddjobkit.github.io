@@ -420,12 +420,7 @@ ${later.map(benchItem).join("\n")}
 
 <section class="facts" aria-labelledby="build">
   <h2 id="build">How every tool is built</h2>
-  <ul>
-    <li><h3>No analytics</h3><p>No tracking and no telemetry in any extension. Anything that does use the network is disclosed on the listing and in the privacy policy.</p></li>
-    <li><h3>Few permissions</h3><p>Each tool asks for the smallest set that does its job, and every permission is explained in plain words.</p></li>
-    <li><h3>Source at release</h3><p>The source of each tool goes public on GitHub when the tool ships, so the claims can be checked.</p></li>
-    <li><h3>A person reads the mail</h3><p>Store reviews get a reply within a week. Questions go to <a href="mailto:${CONTACT}">${CONTACT}</a>.</p></li>
-  </ul>
+  <p>No analytics in the extension. The smallest permission set that does the job. Source goes public when the tool ships. A person reads <a href="mailto:${CONTACT}">${CONTACT}</a>.</p>
 </section>`;
   return page({ title: "Oddjob Kit — small Chrome extensions that each do one odd job well", desc: "Small Chrome extensions that each do one odd job. The task you would otherwise hunt for a sketchy website to do. Permissions are stated on every listing.", path: "/", kind: "home", body, generated: HOME_GENERATED });
 }
@@ -439,13 +434,12 @@ function toolRow(t: Tool): string {
   return `    <li class="line detail" id="${t.slug}">
       ${icon(t, 64)}
       <div class="line-body">
-        <h3>${esc(displayName(t.slug))}</h3>
+        <div class="line-top"><h3>${esc(displayName(t.slug))}</h3><p class="status">${status(t)}${t.version ? ` · ${esc(t.version)}` : ""}</p></div>
         <p class="store-name">${esc(t.name)}</p>
         <p class="job">${inline(t.short || t.purpose)}</p>
         <p class="tool-perms">${esc(t.permLine)}</p>
         <p class="tool-links"><a href="/privacy/${t.slug}/">Privacy policy</a>${store}</p>
       </div>
-      <p class="status">${status(t)}${t.version ? ` · ${esc(t.version)}` : ""}</p>
     </li>`;
 }
 
@@ -464,9 +458,10 @@ function privacyIndex(tools: Tool[]): string {
   const row = (t: Tool) => `    <li>
       <a class="line" href="/privacy/${t.slug}/">
         ${icon(t, 64)}
-        <h3>${esc(displayName(t.slug))}</h3>
-        <p class="job">${esc(trustLine(t))}</p>
-        <p class="status">${longDate(t.updated)}</p>
+        <span class="line-body">
+          <span class="line-top"><h3>${esc(displayName(t.slug))}</h3><span class="status">${longDate(t.updated)}</span></span>
+          <span class="job">${esc(trustLine(t))}</span>
+        </span>
       </a>
     </li>`;
   const body = `<div class="page-head">
